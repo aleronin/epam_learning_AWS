@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "This template creates S3 bucket"
+Parameters:
+  S3Bucketname:
+    Type: String
+    Default: "s3-bucket-eronin-03-07"
+    Description: Name of the current Bucket.
+
+Resources:
+
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Ref "S3Bucketname"
+
+  BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref "S3Bucketname"
+      PolicyDocument:
+        Id: "DenyPolicy"
+        Version: 2012-10-17
+        Statement:
+          - Sid: DeniesAccessToFile
+            Effect: Deny
+            Principal:
+              AWS:
+                - arn:aws:iam::619075200578:user/AleksandrV
+                - arn:aws:iam::619075200578:user/Aleksey
+            Action: 's3:GetObject'
+            Resource:
+              - arn:aws:s3:::s3-bucket-eronin-03-07/second_file.txt

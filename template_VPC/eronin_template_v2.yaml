@@ -1,0 +1,365 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "This template is made for practicing."
+Parameters:
+
+  VPCname:
+    Type: String
+    Default: "eronin-VPC-template"
+    Description: Name of the current VPC.
+
+  InstanceTypeParameter:
+    Type: String
+    Default: "t2.micro"
+    Description: Enter instance size.
+
+Mappings:
+
+  Subnets:
+    VPC:
+      CIDR: "10.0.0.0/16"
+    Public0:
+      CIDR: "10.0.0.0/18"
+    Public1:
+      CIDR: "10.0.64.0/18"
+    Public2:
+      CIDR: "10.0.192.0/18"
+
+Resources:
+
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock:
+        Fn::FindInMap: [ "Subnets", "VPC", "CIDR" ]
+      Tags:
+        - Key: "Network"
+          Value: "Public"
+        - Key: "Name"
+          Value: !Ref "VPCname"
+
+  PublicSubnet0:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      CidrBlock:
+        Fn::FindInMap: [ "Subnets", "Public0", "CIDR" ]
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-public-a'
+
+  PublicSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      CidrBlock:
+        Fn::FindInMap: [ "Subnets", "Public1", "CIDR" ]
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-public-b'
+
+  PublicSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      CidrBlock:
+        Fn::FindInMap: [ "Subnets", "Public2", "CIDR" ]
+      AvailabilityZone: !Select
+        - 2
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-public-c'
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-IGW'
+
+  InternetGatewayAttachment:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      InternetGatewayId:
+        Ref: "InternetGateway"
+
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-public-routes'
+
+  DefaultPublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: "InternetGatewayAttachment"
+    Properties:
+      RouteTableId:
+        Ref: "PublicRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId:
+        Ref: "InternetGateway"
+
+  PublicSubnet0RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet0"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+
+  PublicSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet1"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+
+  PublicSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet2"
+      RouteTableId:
+        Ref: "PublicRouteTable"
+
+  PublicNetworkAcl:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId:
+        Ref: "VPC"
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ''
+            - - !Ref "VPCname"
+              - '-public-nacl'
+
+  OutboundTrafficNetworkAclEntry:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: "true"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+      PortRange:
+        From: "0"
+        To: "65535"
+      Protocol: "-1"
+      RuleAction: "allow"
+      RuleNumber: "100"
+
+  InboundTrafficNetworkAclEntry:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: "false"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+      PortRange:
+        From: "0"
+        To: "65535"
+      Protocol: "-1"
+      RuleAction: "allow"
+      RuleNumber: "100"
+
+  PublicSubnet0NetworkAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet0"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+
+  PublicSubnet1NetworkAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet1"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+
+  PublicSubnet2NetworkAssociation:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId:
+        Ref: "PublicSubnet2"
+      NetworkAclId:
+        Ref: "PublicNetworkAcl"
+
+  SecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allows ssh connections from any IP
+      VpcId:
+         Ref: "VPC"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  FirstEC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-018c1c51c7a13e363"
+      InstanceType:
+        Ref: InstanceTypeParameter
+      SubnetId:
+        Ref: "PublicSubnet0"
+      SecurityGroupIds: [ !Ref "SecurityGroup" ]
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 8
+        - DeviceName: /dev/sdb
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 8
+      Tags:
+        - Key: "Name"
+          Value: EroninEC2FirstInstance
+      UserData:
+
+
+  SecondEC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: "ami-055147723b7bca09a"
+      InstanceType:
+        Ref: InstanceTypeParameter
+      SubnetId:
+        Ref: "PublicSubnet1"
+      SecurityGroupIds: [ !Ref "SecurityGroup" ]
+      IamInstanceProfile: !Ref InstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+      Tags:
+        - Key: "Name"
+          Value: EroninEC2SecondInstance
+
+  EFSFileSystem:
+    Type: "AWS::EFS::FileSystem"
+    Properties:
+      PerformanceMode: generalPurpose
+      FileSystemTags:
+        - Key: "Name"
+          Value: EroninFileSystemLearning
+
+  MountTargetResource0:
+    Type: "AWS::EFS::MountTarget"
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Ref PublicSubnet0
+      SecurityGroups:
+        - Ref: "SecurityGroup"
+
+  MountTargetResource1:
+    Type: "AWS::EFS::MountTarget"
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: !Ref PublicSubnet1
+      SecurityGroups:
+        - Ref: "SecurityGroup"
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: eronin-ec2-instance-profile
+      Path: /
+      Roles:
+       - Ref: "Ec2InstanceRole"
+
+  Ec2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: eronin-ec2-instance-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: /
+
+  InstanceS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EroninS3Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: "s3:*"
+            Resource: "*"
+      Roles:
+        - Ref: Ec2InstanceRole
+
+Outputs:
+
+  VPCId:
+    Description: "VPCId of VPC"
+    Value:
+      Ref: "VPC"
+    Export:
+      Name: !Sub "${AWS::Region}-${AWS::StackName}-VPC"
+
+  PublicSubnet0Id:
+    Description: "SubnetId of public subnet 0"
+    Value:
+      Ref: "PublicSubnet0"
+    Export:
+      Name: !Sub "${AWS::Region}-${AWS::StackName}-PublicSubnet0"
+
+  PublicSubnet1Id:
+    Description: "SubnetId of public subnet 1"
+    Value:
+      Ref: "PublicSubnet1"
+    Export:
+      Name: !Sub "${AWS::Region}-${AWS::StackName}-PublicSubnet1"
+
+  PublicSubnet2Id:
+    Description: "SubnetId of public subnet 2"
+    Value:
+      Ref: "PublicSubnet2"
+    Export:
+      Name: !Sub "${AWS::Region}-${AWS::StackName}-PublicSubnet2"

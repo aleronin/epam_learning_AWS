@@ -1,0 +1,8 @@
+
+# Change path/to/template when creating stack
+
+Fisrt try:
+aws --region ap-southeast-1 cloudformation create-stack --stack-name eronin-vpc-cfn --template-body file://template_VPC/eronin_template.yaml --on-failure DO_NOTHING
+
+Update:
+aws --region ap-southeast-1 cloudformation update-stack --stack-name eronin-vpc-cfn --template-body file://template_VPC/eronin_template_v2.yaml
